@@ -1,26 +1,248 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --karaoke-background: #101019;
+  --karaoke-panel: #1b1b29;
+  --karaoke-surface: #242433;
+  --karaoke-text: #f5f3fa;
+  --karaoke-muted: #b2adc3;
+  --karaoke-disabled: #89849d;
+  --karaoke-border: #383649;
+  --karaoke-pink: #f45abd;
+  --karaoke-purple: #a178f5;
+  --karaoke-blue: #62c5f5;
+  --background: var(--karaoke-background);
+  --foreground: var(--karaoke-text);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+  background: var(--karaoke-background);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 50% -20%, rgb(161 120 245 / 16%), transparent 34rem),
+    var(--karaoke-background);
+  color: var(--karaoke-text);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--karaoke-blue);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  color: var(--karaoke-text);
+  background-color: var(--karaoke-surface);
+  border-color: var(--karaoke-border);
+}
+
+/* iOS Safari zooms focused form controls whose computed text is below 16px. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--karaoke-disabled);
+}
+
+select option {
+  color: var(--karaoke-text);
+  background: var(--karaoke-surface);
+}
+
+/* Existing utility classes are mapped to the single dark-neon design system. */
+[class~="bg-zinc-50"] {
+  background-color: var(--karaoke-background);
+}
+
+[class~="bg-white"] {
+  background-color: var(--karaoke-panel);
+}
+
+[class~="bg-zinc-100"] {
+  background-color: var(--karaoke-surface);
+}
+
+[class~="bg-zinc-900"] {
+  background: linear-gradient(135deg, var(--karaoke-pink), var(--karaoke-purple));
+  box-shadow: 0 5px 20px rgb(244 90 189 / 22%);
+}
+
+[class~="bg-zinc-700"] {
+  background-color: #7d5ad1;
+}
+
+[class~="bg-zinc-400"] {
+  background-color: #4b485c;
+}
+
+[class~="text-zinc-900"],
+[class~="text-zinc-800"] {
+  color: var(--karaoke-text);
+}
+
+[class~="text-zinc-700"],
+[class~="text-zinc-600"] {
+  color: var(--karaoke-muted);
+}
+
+[class~="text-zinc-500"],
+[class~="text-zinc-400"],
+[class~="text-zinc-300"] {
+  color: var(--karaoke-disabled);
+}
+
+[class~="border-zinc-100"],
+[class~="border-zinc-200"],
+[class~="border-zinc-300"] {
+  border-color: var(--karaoke-border);
+}
+
+[class~="border-zinc-900"] {
+  border-color: var(--karaoke-pink);
+  box-shadow: 0 0 0 1px rgb(244 90 189 / 14%), 0 0 14px rgb(161 120 245 / 16%);
+}
+
+[class~="divide-zinc-100"] > :not(:last-child) {
+  border-color: var(--karaoke-border);
+}
+
+[class~="ring-zinc-200"] {
+  --tw-ring-color: rgb(161 120 245 / 42%);
+}
+
+[class~="hover:bg-zinc-50"]:hover,
+[class~="hover:bg-zinc-100"]:hover,
+[class~="hover:bg-white"]:hover {
+  background-color: #2b2a3b;
+}
+
+[class~="hover:text-zinc-900"]:hover {
+  color: var(--karaoke-text);
+}
+
+[class~="shadow-xl"] {
+  box-shadow: 0 20px 52px rgb(0 0 0 / 55%), 0 0 30px rgb(161 120 245 / 12%);
+}
+
+[class~="focus:border-zinc-400"],
+[class~="focus:border-zinc-500"],
+[class~="focus:border-zinc-900"] {
+  --tw-border-opacity: 1;
+  border-color: var(--karaoke-purple);
+}
+
+[class~="focus:ring-zinc-200"] {
+  --tw-ring-color: rgb(98 197 245 / 28%);
+}
+
+/* Main-library controls use deliberate borders independent of global input styles. */
+.karaoke-library-control-border {
+  border-color: var(--karaoke-border) !important;
+}
+
+.karaoke-library-control-border:focus {
+  border-color: var(--karaoke-purple) !important;
+}
+
+.karaoke-library-filter-idle-border {
+  border-color: rgb(161 120 245 / 42%) !important;
+}
+
+[class~="bg-red-50"] {
+  background-color: rgb(116 39 70 / 36%);
+}
+
+[class~="border-red-100"] {
+  border-color: rgb(244 90 189 / 35%);
+}
+
+[class~="text-red-700"] {
+  color: #ff9ccc;
+}
+
+[class~="bg-amber-50"] {
+  background-color: rgb(122 91 32 / 28%);
+}
+
+[class~="text-amber-800"],
+[class~="text-amber-700"],
+[class~="text-amber-900"] {
+  color: #f6d27a;
+}
+
+[class~="bg-rose-50"] {
+  background-color: rgb(142 45 102 / 27%);
+}
+
+[class~="text-rose-700"] {
+  color: #ff9dcc;
+}
+
+.karaoke-title {
+  color: var(--karaoke-text);
+  text-shadow: 0 0 18px rgb(161 120 245 / 34%);
+}
+
+.neon-blue {
+  color: var(--karaoke-blue);
+  filter: drop-shadow(0 0 6px rgb(98 197 245 / 45%));
+}
+
+.karaoke-bottom-bar {
+  background: var(--karaoke-background);
+  box-shadow: none;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
