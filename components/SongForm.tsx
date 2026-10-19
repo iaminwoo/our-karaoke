@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlbumArtworkPicker } from "@/components/AlbumArtworkPicker";
 import { useSongStore } from "@/components/SongDataProvider";
@@ -20,6 +20,50 @@ type FormValues = Omit<CreateSongInput, "singer_scope"> & {
 };
 
 type KaraokeNumberSnapshot = Pick<FormValues, "artist" | "title" | "tj_number" | "ky_number">;
+
+type DuplicateCandidate = {
+  song: KaraokeSong;
+};
+
+function normalizeDuplicateText(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[\s\-_.!"#$%&'()*+,/:;<=>?@[\\\]^`{|}~·…]/g, "");
+}
+
+function getMatchScore(query: string, value: string) {
+  if (query === value) return 100;
+  if (value.startsWith(query) || query.startsWith(value)) return 75;
+  if (value.includes(query) || query.includes(value)) return 60;
+  return 0;
+}
+
+function getDuplicateCandidate(songs: KaraokeSong[], title: string, artist: string): DuplicateCandidate | null {
+  const normalizedTitle = normalizeDuplicateText(title);
+  const normalizedArtist = normalizeDuplicateText(artist);
+
+  if (!normalizedTitle && !normalizedArtist) return null;
+
+  return songs
+    .flatMap((song) => {
+      const titleScore = getMatchScore(normalizedTitle, normalizeDuplicateText(song.title));
+      const artistScore = getMatchScore(normalizedArtist, normalizeDuplicateText(song.artist));
+
+      const hasTitleMismatch = Boolean(normalizedTitle) && !titleScore;
+      const hasArtistMismatch = Boolean(normalizedArtist) && !artistScore;
+      const minimumScore = normalizedTitle && normalizedArtist ? 160 : 75;
+
+      if (hasTitleMismatch || hasArtistMismatch || titleScore + artistScore < minimumScore) return [];
+
+      return [{
+        song,
+        score: titleScore + artistScore,
+      }];
+    })
+    .sort((first, second) => second.score - first.score || first.song.title.localeCompare(second.song.title, "ko-KR"))
+    .map(({ song }) => ({ song }))[0] ?? null;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -95,14 +139,55 @@ export function SongForm({ song }: { song?: KaraokeSong }) {
   const numberSearchAbortController = useRef<AbortController | null>(null);
   const numberSearchId = useRef(0);
   const pendingNumberSnapshot = useRef<KaraokeNumberSnapshot | null>(null);
+  const [duplicateCheckDismissed, setDuplicateCheckDismissed] = useState(false);
+  const [displayedDuplicateCandidate, setDisplayedDuplicateCandidate] = useState<KaraokeSong | null>(null);
+  const [isDuplicateCandidateVisible, setIsDuplicateCandidateVisible] = useState(false);
+  const duplicateCandidateExitTimeout = useRef<number | null>(null);
 
   const formValues = values;
   const editing = Boolean(song);
   const canSearchCover = Boolean(formValues.title.trim() && formValues.artist.trim());
+  const hasDuplicateSearchInput = Boolean(formValues.title.trim() || formValues.artist.trim());
+  const shouldCheckDuplicate = !editing && !duplicateCheckDismissed && hasDuplicateSearchInput;
+
+  const hideDuplicateCandidate = useCallback(() => {
+    setIsDuplicateCandidateVisible(false);
+    if (duplicateCandidateExitTimeout.current) {
+      window.clearTimeout(duplicateCandidateExitTimeout.current);
+    }
+    duplicateCandidateExitTimeout.current = window.setTimeout(() => {
+      setDisplayedDuplicateCandidate(null);
+      duplicateCandidateExitTimeout.current = null;
+    }, 220);
+  }, []);
+
+  const showDuplicateCandidate = useCallback((candidate: KaraokeSong | null) => {
+    if (!candidate) {
+      hideDuplicateCandidate();
+      return;
+    }
+
+    if (duplicateCandidateExitTimeout.current) {
+      window.clearTimeout(duplicateCandidateExitTimeout.current);
+      duplicateCandidateExitTimeout.current = null;
+    }
+    setDisplayedDuplicateCandidate(candidate);
+    requestAnimationFrame(() => setIsDuplicateCandidateVisible(true));
+  }, [hideDuplicateCandidate]);
 
   useEffect(() => {
     currentValues.current = values;
   }, [values]);
+
+  useEffect(() => {
+    if (!shouldCheckDuplicate) return;
+
+    const timer = window.setTimeout(() => {
+      showDuplicateCandidate(getDuplicateCandidate(songs, formValues.title, formValues.artist)?.song ?? null);
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [formValues.artist, formValues.title, shouldCheckDuplicate, showDuplicateCandidate, songs]);
 
   useEffect(() => {
     mounted.current = true;
@@ -110,11 +195,17 @@ export function SongForm({ song }: { song?: KaraokeSong }) {
     return () => {
       mounted.current = false;
       numberSearchAbortController.current?.abort();
+      if (duplicateCandidateExitTimeout.current) {
+        window.clearTimeout(duplicateCandidateExitTimeout.current);
+      }
     };
   }, []);
 
   function set<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => current ? { ...current, [key]: value } : current);
+    if (!editing && (key === "title" || key === "artist")) {
+      hideDuplicateCandidate();
+    }
   }
 
   async function fetchItunesCandidates(query: string, isDefaultSearch = false) {
@@ -192,6 +283,10 @@ export function SongForm({ song }: { song?: KaraokeSong }) {
   async function openCoverPicker() {
     if (!canSearchCover) return;
 
+    if (!editing) {
+      setDuplicateCheckDismissed(true);
+      hideDuplicateCandidate();
+    }
     setCoverOpen(true);
     if (candidates.length === 0 && !coverLoading) {
       await fetchItunesCandidates(`${formValues.title} ${formValues.artist}`, true);
@@ -331,6 +426,20 @@ export function SongForm({ song }: { song?: KaraokeSong }) {
             </button>
           </div>
           {coverError && !coverOpen && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{coverError}</p>}
+          {!editing && (
+            <div
+              className={`-mt-2 mb-2 grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${shouldCheckDuplicate ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+              aria-hidden={!shouldCheckDuplicate}
+              inert={!shouldCheckDuplicate || undefined}
+            >
+              <div className="min-h-0 overflow-hidden">
+                <DuplicateCheckNotice
+                  song={displayedDuplicateCandidate}
+                  visible={isDuplicateCandidateVisible}
+                />
+              </div>
+            </div>
+          )}
           <Fields
             isNumberSearching={isNumberSearching}
             numberSearchError={numberSearchError}
@@ -411,6 +520,25 @@ function BasicFields({ values, set }: { values: FormValues; set: <K extends keyo
     <label className="block text-sm font-medium">곡명<input className="mt-2 w-full rounded-lg border border-zinc-200 bg-white p-3 font-normal" value={values.title} onChange={(event) => set("title", event.target.value)} required /></label>
     <label className="block text-sm font-medium">가수명<input className="mt-2 w-full rounded-lg border border-zinc-200 bg-white p-3 font-normal" value={values.artist} onChange={(event) => set("artist", event.target.value)} required /></label>
   </>;
+}
+
+function DuplicateCheckNotice({
+  song,
+  visible,
+}: {
+  song: KaraokeSong | null;
+  visible: boolean;
+}) {
+  return (
+    <section className="min-h-8" aria-live="polite" aria-label="중복 확인">
+      <p className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700">
+        <span className="text-xs text-zinc-500">혹시?</span>
+        <span className={`inline-block transition-all duration-200 ease-out motion-reduce:transition-none ${visible && song ? "ml-2 translate-y-0 opacity-100" : "translate-y-1 opacity-0"}`}>
+          {song && <><span className="font-semibold text-zinc-900">{song.title}</span> - {song.artist}</>}
+        </span>
+      </p>
+    </section>
+  );
 }
 
 function CapsuleFieldset({
